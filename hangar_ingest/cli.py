@@ -8,6 +8,7 @@ from hangar_ingest.api import Application
 from hangar_ingest.runs.database import Database
 from hangar_ingest.runs import batches, inspection, processor
 from hangar_ingest.exports import releases, tabular
+from hangar_ingest.analysis import exercise
 
 
 def make_parser():
@@ -36,6 +37,11 @@ def make_parser():
     export.add_argument('--format', choices=['directory', 'csv', 'ndjson'], default='directory')
     demo = sub.add_parser('demo')
     demo.add_argument('--fixture', required=True)
+    period_demo = sub.add_parser('period-demo', help='Run the local period-search exercise (numeric output)')
+    period_demo.add_argument('--seed', type=int, default=13)
+    period_demo.add_argument('--permutations', type=int, default=49)
+    period_demo.add_argument('--noise-seed', type=int, default=29)
+    period_demo.add_argument('--alias-noise-seed', type=int, default=41)
     return parser
 
 
@@ -117,6 +123,13 @@ def dispatch(app, args):
         return write_new(args.destination, content)
     if args.command == 'demo':
         return demo(app, json_input(args.fixture))
+    if args.command == 'period-demo':
+        return exercise.run(
+            seed=args.seed,
+            permutations=args.permutations,
+            noise_seed=args.noise_seed,
+            alias_noise_seed=args.alias_noise_seed,
+        )
     fail('unknown_command', 'Unknown command')
 
 

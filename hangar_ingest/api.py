@@ -5,6 +5,7 @@ from hangar_ingest.runs import batches, claims, inspection, journal, partitions,
 from hangar_ingest.runs.orchestrator import Pipeline
 from hangar_ingest.exports import releases, tabular, watermarks, transfer
 from hangar_ingest.exports.contracts import DeliveryContracts
+from hangar_ingest.analysis import period, exercise
 
 
 class Application:
@@ -81,6 +82,12 @@ class Application:
             'profile.measure': (profiles.profile, {'device_id', 'start', 'end'}, set()),
             'profile.compare': (profiles.compare_periods, {'device_id', 'baseline_start', 'baseline_end', 'current_start', 'current_end'}, {'threshold'}),
             'profile.outliers': (profiles.outliers, {'device_id', 'start', 'end'}, {'multiplier'}),
+            'period.analyze': (
+                period.analyze,
+                {'device_id', 'metric', 'start', 'end', 'minimum_frequency_hz', 'maximum_frequency_hz', 'resolution_hz'},
+                {'exclude_quality_codes', 'duplicate_time_policy', 'gap_seconds', 'include_maintenance',
+                 'permutations', 'seed', 'block_seconds', 'minimum_segment_samples', 'minimum_samples', 'top_peaks'},
+            ),
             'watermark.advance': (watermarks.advance, {'source', 'watermark'}, {'revision'}),
             'watermark.list': (watermarks.list_watermarks, set(), set()),
             'watermark.readiness': (watermarks.readiness, {'partition_key'}, set()),
@@ -142,13 +149,16 @@ class Application:
         if operation == 'package.verify':
             object_fields(parameters, {'value'})
             return releases.verify_package(parameters['value'])
+        if operation == 'period.exercise':
+            object_fields(parameters, set(), {'seed', 'permutations', 'noise_seed', 'alias_noise_seed'})
+            return exercise.run(**parameters)
         if operation == 'units.list':
             object_fields(parameters, set(), {'dimension'})
             return units.supported(**parameters)
         fail('unknown_operation', 'Unknown pipeline operation', operation=operation)
 
     def commands(self):
-        return sorted(set(self.operations) | set(self.bound) | {'batch.stage', 'package.verify', 'units.list'})
+        return sorted(set(self.operations) | set(self.bound) | {'batch.stage', 'package.verify', 'units.list', 'period.exercise'})
 
     def batch(self, commands):
         if not isinstance(commands, list) or len(commands) > 1000:
